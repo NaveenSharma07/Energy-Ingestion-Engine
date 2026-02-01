@@ -1,0 +1,76 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Hot Store: Current Status Tables (UPSERT operations)
+
+model MeterCurrentStatus {
+  meterId        String   @id @map("meter_id") @db.VarChar(255)
+  kwhConsumedAc  Decimal  @map("kwh_consumed_ac") @db.Decimal(10, 3)
+  voltage        Decimal  @db.Decimal(6, 2)
+  lastUpdated    DateTime @default(now()) @map("last_updated")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@map("meter_current_status")
+  @@index([lastUpdated], map: "idx_meter_current_updated")
+}
+
+model VehicleCurrentStatus {
+  vehicleId      String   @id @map("vehicle_id") @db.VarChar(255)
+  soc            Decimal  @db.Decimal(5, 2) // 0-100
+  kwhDeliveredDc Decimal  @map("kwh_delivered_dc") @db.Decimal(10, 3)
+  batteryTemp    Decimal  @map("battery_temp") @db.Decimal(5, 2)
+  lastUpdated    DateTime @default(now()) @map("last_updated")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@map("vehicle_current_status")
+  @@index([lastUpdated], map: "idx_vehicle_current_updated")
+}
+
+// Cold Store: Historical Data Tables (INSERT only)
+
+model MeterHistory {
+  id            BigInt   @id @default(autoincrement())
+  meterId       String   @map("meter_id") @db.VarChar(255)
+  kwhConsumedAc Decimal  @map("kwh_consumed_ac") @db.Decimal(10, 3)
+  voltage       Decimal  @db.Decimal(6, 2)
+  timestamp     DateTime
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@map("meter_history")
+  @@index([meterId, timestamp(sort: Desc)], map: "idx_meter_history_meter_time")
+  @@index([timestamp(sort: Desc)], map: "idx_meter_history_timestamp")
+}
+
+model VehicleHistory {
+  id            BigInt   @id @default(autoincrement())
+  vehicleId     String   @map("vehicle_id") @db.VarChar(255)
+  soc           Decimal  @db.Decimal(5, 2) // 0-100
+  kwhDeliveredDc Decimal @map("kwh_delivered_dc") @db.Decimal(10, 3)
+  batteryTemp   Decimal  @map("battery_temp") @db.Decimal(5, 2)
+  timestamp     DateTime
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@map("vehicle_history")
+  @@index([vehicleId, timestamp(sort: Desc)], map: "idx_vehicle_history_vehicle_time")
+  @@index([timestamp(sort: Desc)], map: "idx_vehicle_history_timestamp")
+}
+
+// Meter-Vehicle Mapping Table (for correlation)
+model MeterVehicleMapping {
+  meterId   String   @id @map("meter_id") @db.VarChar(255)
+  vehicleId String   @map("vehicle_id") @db.VarChar(255)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("meter_vehicle_mapping")
+  @@index([vehicleId], map: "idx_mapping_vehicle")
+}
